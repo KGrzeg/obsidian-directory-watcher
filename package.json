@@ -1,7 +1,7 @@
 {
-  "name": "obsidian-sample-plugin",
+  "name": "obsidian-directory-watcher",
   "version": "0.12.0",
-  "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+  "description": "This is a plugin for Obsidian (https://obsidian.md) that watch directory and update notes on change",
   "main": "main.js",
   "scripts": {
     "dev": "rollup --config rollup.config.js -w",
