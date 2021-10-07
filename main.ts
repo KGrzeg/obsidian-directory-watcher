@@ -130,7 +130,11 @@ export default class DirectoryWatcher extends Plugin {
 	}
 
 	startWatching() {
-		log("Watching " + this.settings.directoryToWatch);
+		this.registerEvent(this.app.vault.on("create", (file) => {
+			if (file.parent.path == this.settings.directoryToWatch){
+				log(file);
+			}
+		}));
 	}
 
 	stopWatching() {
