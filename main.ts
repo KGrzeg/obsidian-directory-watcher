@@ -43,39 +43,9 @@ export default class DirectoryWatcher extends Plugin {
 		// });
 
 
-		const devBadge = this.addStatusBarItem();
-		devBadge.setText('Dev Plugin Enabled *');
-		devBadge.style.color = "yellowgreen";
-
-		this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
-			const path = file.path;
-
-			if (file instanceof TFile) {
-				if (file.extension === 'md')
-					menu.addItem((item: MenuItem) => {
-						item
-							.setTitle("Set as file to update")
-							.setIcon("star")
-							.onClick(async () => {
-								log("Kliknąłeś plik o ścieżce " + path);
-								this.settings.noteToUpdate = path;
-								await this.saveSettings();
-							});
-					});
-			}
-			if (file instanceof TFolder) {
-				menu.addItem((item: MenuItem) => {
-					item
-						.setTitle("Set as watched directory")
-						.setIcon("star")
-						.onClick(async () => {
-							log("Kliknąłeś folder o ścieżce " + path);
-							this.settings.directoryToWatch = path;
-							await this.saveSettings();
-						});
-				});
-			}
-		}));
+		this.registerDevBadge();
+		this.registerContextMenu();
+		this.startWatching();
 
 		// this.addCommand({
 		// 	id: 'open-sample-modal',
@@ -110,6 +80,7 @@ export default class DirectoryWatcher extends Plugin {
 
 	onunload() {
 		log('unloading plugin');
+		this.stopWatching();
 	}
 
 	async loadSettings() {
@@ -118,6 +89,67 @@ export default class DirectoryWatcher extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	registerContextMenu() {
+		this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+			const path = file.path;
+
+			if (file instanceof TFile) {
+				if (file.extension === 'md')
+					menu.addItem((item: MenuItem) => {
+						item
+							.setTitle("Set as file to update")
+							.setIcon("star")
+							.onClick(async () => {
+								log("Kliknąłeś plik o ścieżce " + path);
+								await this.updateNotePath(path);
+							});
+					});
+			}
+			if (file instanceof TFolder) {
+				menu.addItem((item: MenuItem) => {
+					item
+						.setTitle("Set as watched directory")
+						.setIcon("star")
+						.onClick(async () => {
+							log("Kliknąłeś folder o ścieżce " + path);
+							await this.updateDirectoryPath(path);
+						});
+				});
+			}
+		}));
+	}
+
+	registerDevBadge() {
+		if (DEV) {
+			const devBadge = this.addStatusBarItem();
+			devBadge.setText('Dev Plugin Enabled *');
+			devBadge.style.color = "yellowgreen";
+		}
+	}
+
+	startWatching() {
+		log("Watching " + this.settings.directoryToWatch);
+	}
+
+	stopWatching() {
+		log("Stop watching " + this.settings.directoryToWatch);
+	}
+
+	async updateDirectoryPath(path: string) {
+		console.log(this);
+		this.stopWatching();
+
+		this.settings.directoryToWatch = path;
+		await this.saveSettings();
+
+		this.startWatching();
+	}
+
+	async updateNotePath(path: string) {
+		this.settings.noteToUpdate = path;
+		await this.saveSettings();
 	}
 }
 
@@ -159,12 +191,7 @@ class SampleSettingTab extends PluginSettingTab {
 			.addText(text => text
 				.setPlaceholder('Relative path to directory')
 				.setValue(this.plugin.settings.directoryToWatch)
-				.setDisabled(true)
-				.onChange(async (value) => {
-					log('Directory to watch changed to: ' + value);
-					this.plugin.settings.directoryToWatch = value;
-					await this.plugin.saveSettings();
-				}));
+				.setDisabled(true));
 
 		new Setting(containerEl)
 			.setName('Note to update')
@@ -172,11 +199,6 @@ class SampleSettingTab extends PluginSettingTab {
 			.addText(text => text
 				.setPlaceholder('Name of note')
 				.setValue(this.plugin.settings.noteToUpdate)
-				.setDisabled(true)
-				.onChange(async (value) => {
-					log('Note\'s name to watch changed to: ' + value);
-					this.plugin.settings.noteToUpdate = value;
-					await this.plugin.saveSettings();
-				}));
+				.setDisabled(true));
 	}
 }
