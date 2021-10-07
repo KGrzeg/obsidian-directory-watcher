@@ -1,60 +1,115 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {
+	App,
+	MenuItem,
+	// Modal,
+	// Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	TFile,
+	TFolder
+} from 'obsidian';
 
-interface MyPluginSettings {
-	mySetting: string;
+// manage manually for now
+// TODO: pass BUILD env from rollup to plugin
+const DEV = true;
+
+function log(message?: any, ...optionalParams: any[]): void {
+	if (DEV) console.log(message, ...optionalParams);
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+interface DirectoryWatcherSettings {
+	directoryToWatch: string;
+	noteToUpdate: string;
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+const DEFAULT_SETTINGS: DirectoryWatcherSettings = {
+	directoryToWatch: '',
+	noteToUpdate: ''
+}
+
+export default class DirectoryWatcher extends Plugin {
+	settings: DirectoryWatcherSettings;
 
 	async onload() {
-		console.log('loading plugin');
+		log('loading plugin');
 
 		await this.loadSettings();
+		log('The sttings:', this.settings);
 
-		this.addRibbonIcon('dice', 'Sample Plugin', () => {
-			new Notice('This is a notice!');
-		});
 
-		this.addStatusBarItem().setText('Status Bar Text');
+		// this.addRibbonIcon('dice', 'Sample Plugin', () => {
+		// 	new Notice('This is a notice!');
+		// });
 
-		this.addCommand({
-			id: 'open-sample-modal',
-			name: 'Open Sample Modal',
-			// callback: () => {
-			// 	console.log('Simple Callback');
-			// },
-			checkCallback: (checking: boolean) => {
-				let leaf = this.app.workspace.activeLeaf;
-				if (leaf) {
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-					return true;
-				}
-				return false;
+
+		const devBadge = this.addStatusBarItem();
+		devBadge.setText('Dev Plugin Enabled *');
+		devBadge.style.color = "yellowgreen";
+
+		this.registerEvent(this.app.workspace.on("file-menu", (menu, file) => {
+			const path = file.path;
+
+			if (file instanceof TFile) {
+				if (file.extension === 'md')
+					menu.addItem((item: MenuItem) => {
+						item
+							.setTitle("Set as file to update")
+							.setIcon("star")
+							.onClick(async () => {
+								log("Kliknąłeś plik o ścieżce " + path);
+								this.settings.noteToUpdate = path;
+								await this.saveSettings();
+							});
+					});
 			}
-		});
+			if (file instanceof TFolder) {
+				menu.addItem((item: MenuItem) => {
+					item
+						.setTitle("Set as watched directory")
+						.setIcon("star")
+						.onClick(async () => {
+							log("Kliknąłeś folder o ścieżce " + path);
+							this.settings.directoryToWatch = path;
+							await this.saveSettings();
+						});
+				});
+			}
+		}));
+
+		// this.addCommand({
+		// 	id: 'open-sample-modal',
+		// 	name: 'Open Sample Modal',
+		// 	// callback: () => {
+		// 	// 	log('Simple Callback');
+		// 	// },
+		// 	checkCallback: (checking: boolean) => {
+		// 		let leaf = this.app.workspace.activeLeaf;
+		// 		if (leaf) {
+		// 			if (!checking) {
+		// 				new SampleModal(this.app).open();
+		// 			}
+		// 			return true;
+		// 		}
+		// 		return false;
+		// 	}
+		// });
 
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
-		this.registerCodeMirror((cm: CodeMirror.Editor) => {
-			console.log('codemirror', cm);
-		});
+		// this.registerCodeMirror((cm: CodeMirror.Editor) => {
+		// 	log('codemirror', cm);
+		// });
 
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
+		// this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+		// 	log('click', evt);
+		// });
 
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// this.registerInterval(window.setInterval(() => log('setInterval'), 5 * 60 * 1000));
 	}
 
 	onunload() {
-		console.log('unloading plugin');
+		log('unloading plugin');
 	}
 
 	async loadSettings() {
@@ -66,46 +121,61 @@ export default class MyPlugin extends Plugin {
 	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+// class SampleModal extends Modal {
+// 	constructor(app: App) {
+// 		super(app);
+// 	}
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+// 	onOpen() {
+// 		let {contentEl} = this;
+// 		contentEl.setText('Woah!');
+// 	}
 
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
+// 	onClose() {
+// 		let {contentEl} = this;
+// 		contentEl.empty();
+// 	}
+// }
 
 class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: DirectoryWatcher;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: DirectoryWatcher) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		let {containerEl} = this;
+		let { containerEl } = this;
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
+		// containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
+			.setName('Directory to watch')
+			.setDesc('The changes in the directory will be reflected in note.'
+				+ 'Use context menu in file explorer to change the value.')
 			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue('')
+				.setPlaceholder('Relative path to directory')
+				.setValue(this.plugin.settings.directoryToWatch)
+				.setDisabled(true)
 				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+					log('Directory to watch changed to: ' + value);
+					this.plugin.settings.directoryToWatch = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Note to update')
+			.setDesc('The changes will be pasted to this note. Use context menu in file explorer to change the value.')
+			.addText(text => text
+				.setPlaceholder('Name of note')
+				.setValue(this.plugin.settings.noteToUpdate)
+				.setDisabled(true)
+				.onChange(async (value) => {
+					log('Note\'s name to watch changed to: ' + value);
+					this.plugin.settings.noteToUpdate = value;
 					await this.plugin.saveSettings();
 				}));
 	}
