@@ -1,8 +1,6 @@
 import {
 	App,
 	MenuItem,
-	// Modal,
-	// Notice,
 	Plugin,
 	PluginSettingTab,
 	Setting,
@@ -37,45 +35,11 @@ export default class DirectoryWatcher extends Plugin {
 		await this.loadSettings();
 		log('The sttings:', this.settings);
 
-
-		// this.addRibbonIcon('dice', 'Sample Plugin', () => {
-		// 	new Notice('This is a notice!');
-		// });
-
-
 		this.registerDevBadge();
 		this.registerContextMenu();
 		this.startWatching();
 
-		// this.addCommand({
-		// 	id: 'open-sample-modal',
-		// 	name: 'Open Sample Modal',
-		// 	// callback: () => {
-		// 	// 	log('Simple Callback');
-		// 	// },
-		// 	checkCallback: (checking: boolean) => {
-		// 		let leaf = this.app.workspace.activeLeaf;
-		// 		if (leaf) {
-		// 			if (!checking) {
-		// 				new SampleModal(this.app).open();
-		// 			}
-		// 			return true;
-		// 		}
-		// 		return false;
-		// 	}
-		// });
-
 		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// this.registerCodeMirror((cm: CodeMirror.Editor) => {
-		// 	log('codemirror', cm);
-		// });
-
-		// this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-		// 	log('click', evt);
-		// });
-
-		// this.registerInterval(window.setInterval(() => log('setInterval'), 5 * 60 * 1000));
 	}
 
 	onunload() {
@@ -157,22 +121,6 @@ export default class DirectoryWatcher extends Plugin {
 	}
 }
 
-// class SampleModal extends Modal {
-// 	constructor(app: App) {
-// 		super(app);
-// 	}
-
-// 	onOpen() {
-// 		let {contentEl} = this;
-// 		contentEl.setText('Woah!');
-// 	}
-
-// 	onClose() {
-// 		let {contentEl} = this;
-// 		contentEl.empty();
-// 	}
-// }
-
 class SampleSettingTab extends PluginSettingTab {
 	plugin: DirectoryWatcher;
 
@@ -185,8 +133,6 @@ class SampleSettingTab extends PluginSettingTab {
 		let { containerEl } = this;
 
 		containerEl.empty();
-
-		// containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
 
 		new Setting(containerEl)
 			.setName('Directory to watch')
