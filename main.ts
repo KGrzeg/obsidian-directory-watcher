@@ -5,7 +5,9 @@ import {
 	PluginSettingTab,
 	Setting,
 	TFile,
-	TFolder
+	TFolder,
+	debounce,
+	TAbstractFile
 } from 'obsidian';
 
 // manage manually for now
@@ -28,23 +30,31 @@ const DEFAULT_SETTINGS: DirectoryWatcherSettings = {
 
 export default class DirectoryWatcher extends Plugin {
 	settings: DirectoryWatcherSettings;
+	filesToAdd: TAbstractFile[];
+	updateNote: any;
 
 	async onload() {
 		log('loading plugin');
 
 		await this.loadSettings();
-		log('The sttings:', this.settings);
+		log('The settings:', this.settings);
+
+		this.filesToAdd = [];
+		this.updateNote = debounce(this.updateNote_raw, 500, true);
+
+		this.addSettingTab(new SampleSettingTab(this.app, this));
 
 		this.registerDevBadge();
 		this.registerContextMenu();
-		this.startWatching();
-
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.registerEvent(this.app.vault.on("create", newImage => {
+			if (newImage.parent.path == this.settings.directoryToWatch) {
+				this.addToNote(newImage);
+			}
+		}));
 	}
 
 	onunload() {
 		log('unloading plugin');
-		this.stopWatching();
 	}
 
 	async loadSettings() {
@@ -66,7 +76,6 @@ export default class DirectoryWatcher extends Plugin {
 							.setTitle("Set as file to update")
 							.setIcon("star")
 							.onClick(async () => {
-								log("Kliknąłeś plik o ścieżce " + path);
 								await this.updateNotePath(path);
 							});
 					});
@@ -77,7 +86,6 @@ export default class DirectoryWatcher extends Plugin {
 						.setTitle("Set as watched directory")
 						.setIcon("star")
 						.onClick(async () => {
-							log("Kliknąłeś folder o ścieżce " + path);
 							await this.updateDirectoryPath(path);
 						});
 				});
@@ -93,26 +101,55 @@ export default class DirectoryWatcher extends Plugin {
 		}
 	}
 
-	startWatching() {
-		this.registerEvent(this.app.vault.on("create", (file) => {
-			if (file.parent.path == this.settings.directoryToWatch){
-				log(file);
-			}
-		}));
+	addToNote(fileName: TAbstractFile) {
+		this.filesToAdd.push(fileName);
+		log(`Added ${fileName} to update list`);
+		this.updateNote();
 	}
 
-	stopWatching() {
-		log("Stop watching " + this.settings.directoryToWatch);
+	prepareContent(previousContent: string, filesToAdd: TAbstractFile[]) {
+		const appendLines = filesToAdd
+			.map(fileName => `- ![[${fileName.name}]]`)
+			.join('\n');
+
+		const newContent = previousContent + '\n' + appendLines;
+
+		//sort and remove doubles
+		return newContent
+			.split('\n')
+			.sort((a, b) => a.localeCompare(b))
+			//remove duplicates taking advantage from sorted lines
+			.filter((item, pos, arr) => !pos || item != arr[pos - 1])
+			.join('\n');
+	}
+
+	async updateNote_raw() {
+		const filesToAdd = this.filesToAdd;
+		this.filesToAdd = [];
+
+		log(`Execute updating with `, filesToAdd);
+
+		const noteToUpdate = this.app.vault.getAbstractFileByPath(this.settings.noteToUpdate);
+		if (noteToUpdate instanceof TFile) {
+			const previousContent = await this.app.vault.read(noteToUpdate);
+			const content = this.prepareContent(previousContent, filesToAdd);
+
+			await this.app.vault.modify(
+				noteToUpdate,
+				content
+			);
+
+			log(`Updated ${noteToUpdate.path} with ${filesToAdd.length} lines`);
+		} else {
+			console.error("The note to update do not exists");
+		}
 	}
 
 	async updateDirectoryPath(path: string) {
 		console.log(this);
-		this.stopWatching();
 
 		this.settings.directoryToWatch = path;
 		await this.saveSettings();
-
-		this.startWatching();
 	}
 
 	async updateNotePath(path: string) {
