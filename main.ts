@@ -110,7 +110,7 @@ class NoteUpdater {
 		this.filesToAdd.push(
 			await ImageFile.create(file, this.basePath)
 		);
-		
+
 		this.update();
 	}
 
@@ -134,7 +134,6 @@ class NoteUpdater {
 		} else {
 			console.error("The note to update do not exists");
 		}
-
 	}
 
 	prepareContent(previousContent: string, filesToAdd: ImageFile[]) {
@@ -225,30 +224,6 @@ export default class DirectoryWatcher extends Plugin {
 			const devBadge = this.addStatusBarItem();
 			devBadge.setText('Dev Plugin Enabled *');
 			devBadge.style.color = "yellowgreen";
-		}
-	}
-
-
-
-	async updateNote_raw() {
-		const filesToAdd = this.filesToAdd;
-		this.filesToAdd = [];
-
-		log(`Execute updating with `, filesToAdd);
-
-		const noteToUpdate = this.app.vault.getAbstractFileByPath(this.settings.noteToUpdate);
-		if (noteToUpdate instanceof TFile) {
-			const previousContent = await this.app.vault.read(noteToUpdate);
-			const content = this.prepareContent(previousContent, filesToAdd);
-
-			await this.app.vault.modify(
-				noteToUpdate,
-				content
-			);
-
-			log(`Updated ${noteToUpdate.path} with ${filesToAdd.length} lines`);
-		} else {
-			console.error("The note to update do not exists");
 		}
 	}
 
