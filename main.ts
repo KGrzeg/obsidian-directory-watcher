@@ -6,9 +6,26 @@ import {
 	Setting,
 	TFile,
 	TFolder,
-	debounce,
-	TAbstractFile
+	debounce
 } from 'obsidian';
+
+import { ExifImage, ExifData } from 'exif';
+import { join } from 'path';
+
+function readMetaData(path: string): Promise<ExifData> {
+	return new Promise((resolve, reject) => {
+		try {
+			new ExifImage({ image: path }, function (error, exifData) {
+				if (error)
+					reject(error);
+
+				resolve(exifData);
+			})
+		} catch (error) {
+			reject(error);
+		}
+	});
+}
 
 // manage manually for now
 // TODO: pass BUILD env from rollup to plugin
@@ -28,13 +45,52 @@ const DEFAULT_SETTINGS: DirectoryWatcherSettings = {
 	noteToUpdate: ''
 }
 
+class ImageFile {
+	file: TFile;
+	meta: ExifData;
+
+	constructor(file: TFile, meta: ExifData) {
+		this.file = file;
+		this.meta = meta;
+	}
+
+	getNoteLine(): string {
+		let displayName = this.file.name;
+
+		if (this.meta?.exif?.CreateDate) {
+			displayName += " created at " + this.meta.exif.CreateDate;
+		}
+
+		return `- ![${displayName}](${this.file.name})`
+	}
+
+	static async create(file: TFile, absPath: string) {
+		let meta = null;
+		if (file.extension == 'jpg' || file.extension == 'jpeg') {
+			const path = join(absPath, file.path);
+			log("read " + path);
+			try {
+				meta = await readMetaData(path);
+				console.log("Found meta: ", meta);
+			} catch (error) {
+				console.warn("Exif error:", error);
+			}
+		}
+
+		return new ImageFile(file, meta);
+	}
+}
+
 export default class DirectoryWatcher extends Plugin {
 	settings: DirectoryWatcherSettings;
-	filesToAdd: TAbstractFile[];
+	filesToAdd: ImageFile[];
 	updateNote: any;
+	basePath: string;
 
 	async onload() {
 		log('loading plugin');
+
+		this.basePath = (this.app.vault.adapter as any).basePath;
 
 		await this.loadSettings();
 		log('The settings:', this.settings);
@@ -47,7 +103,8 @@ export default class DirectoryWatcher extends Plugin {
 		this.registerDevBadge();
 		this.registerContextMenu();
 		this.registerEvent(this.app.vault.on("create", newImage => {
-			if (newImage.parent.path == this.settings.directoryToWatch) {
+			if (newImage instanceof TFile
+				&& newImage.parent.path == this.settings.directoryToWatch) {
 				this.addToNote(newImage);
 			}
 		}));
@@ -101,15 +158,16 @@ export default class DirectoryWatcher extends Plugin {
 		}
 	}
 
-	addToNote(fileName: TAbstractFile) {
-		this.filesToAdd.push(fileName);
-		log(`Added ${fileName} to update list`);
+	async addToNote(file: TFile) {
+		const newFile = await ImageFile.create(file, this.basePath);
+
+		this.filesToAdd.push(newFile);
 		this.updateNote();
 	}
 
-	prepareContent(previousContent: string, filesToAdd: TAbstractFile[]) {
+	prepareContent(previousContent: string, filesToAdd: ImageFile[]) {
 		const appendLines = filesToAdd
-			.map(fileName => `- ![[${fileName.name}]]`)
+			.map(file => file.getNoteLine())
 			.join('\n');
 
 		const newContent = previousContent + '\n' + appendLines;
